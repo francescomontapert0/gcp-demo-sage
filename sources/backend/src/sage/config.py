@@ -12,7 +12,7 @@ class AppConfig(BaseSettings):
     # GCP
     project_id: str
     region: str = "europe-west6"
-
+    
     # Shared-project mode: when set, resource names derive from this prefix instead of the
     # dedicated-project defaults (same rules as devops/cloud/locals.tf). Empty = dedicated.
     resource_prefix: str = ""
@@ -26,7 +26,8 @@ class AppConfig(BaseSettings):
     chat_model: str = "gemini-2.5-flash"
     embedding_model: str = "text-embedding-004"
     embedding_dimension: int = 768
-
+    instructions_bucket: str = ""
+    instructions_object: str = "istruzioni.md"
     # BigQuery
     bq_dataset: str = "sage_analytics"
     bq_table: str = "question_log"

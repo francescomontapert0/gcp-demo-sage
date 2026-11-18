@@ -7,27 +7,35 @@ MOCK: in-memory placeholder, nothing is persisted across process restarts and
 """
 
 from sage.domain.qa.models import Chunk
+from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
+from google.cloud.firestore_v1.vector import Vector
 
-_mock_store: dict[str, list[Chunk]] = {}
+from sage.config import get_app_config
+from sage.domain.qa.models import Chunk
+from sage.integrations.firestore.client import get_firestore_client
 
+def _col():
+    return get_firestore_client().collection(get_app_config().firestore_collection)
 
 def find_nearest_chunks(embedding: list[float]) -> list[Chunk]:
-    return []
-
+    query = _col().find_nearest(
+        vector_field="embedding",
+        query_vector=Vector(embedding),
+        distance_measure=DistanceMeasure.COSINE,
+        limit=get_app_config().top_k,
+    )
+    return [
+        Chunk(id=d.id, text=d.get("text"), source=d.get("source"),
+              section=d.get("section"), chunk_index=d.get("chunk_index"))
+        for d in query.stream()
+    ]
 
 def delete_chunks_for_source(source: str) -> None:
-    """Remove existing chunks for a document, so re-running the ingestion script is safe."""
-    _mock_store.pop(source, None)
+    for d in _col().where("source", "==", source).stream():
+        d.reference.delete()
 
-
-def add_chunk(
-    chunk_id: str,
-    text: str,
-    embedding: list[float],
-    source: str,
-    section: str | None,
-    chunk_index: int,
-) -> None:
-    _mock_store.setdefault(source, []).append(
-        Chunk(id=chunk_id, text=text, source=source, section=section, chunk_index=chunk_index)
-    )
+def add_chunk(chunk_id, text, embedding, source, section, chunk_index) -> None:
+    _col().document(chunk_id).set({
+        "text": text, "embedding": Vector(embedding), "source": source,
+        "section": section, "chunk_index": chunk_index,
+    })
